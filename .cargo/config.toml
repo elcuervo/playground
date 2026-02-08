@@ -1,0 +1,11 @@
+[target.wasm32-unknown-emscripten]
+rustflags = [
+    "-C",
+    "link-args=-o playground.js",
+    "-C",
+    "link-args=-s EXPORTED_FUNCTIONS=['_count_chars','_main']",
+    "-C",
+    "link-args=-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
+    "-C",
+    "link-args=-s MODULARIZE=0",
+]
