@@ -39,6 +39,7 @@ use bindings::{
     MRC_DUMP_OK, mrc_ccontext, mrc_ccontext_free, mrc_ccontext_new, mrc_dump_irep, mrc_irep,
     mrc_irep_free, mrc_load_string_cxt,
 };
+use mrubyedge::yamrb::helpers::mrb_call_inspect;
 
 #[derive(Debug)]
 pub struct MRubyCompiler2Error {
@@ -149,13 +150,20 @@ pub extern "C" fn count_chars(text_ptr: *const c_char) {
         let text = c_str.to_str().unwrap_or("");
 
         let mut context = MRubyCompiler2Context::new();
-        let data = context.compile(text).unwrap();
+        let mrb = context.compile(text).unwrap();
 
-        // Count characters
-        let char_count = data.len();
+        let mut rite = mrubyedge::rite::load(&mrb).unwrap();
+        let mut vm = mrubyedge::yamrb::vm::VM::open(&mut rite);
+        mruby_serde_json::init_json(&mut vm);
+        let result = vm.run().unwrap();
+        let result_as_inspect: String = mrb_call_inspect(&mut vm, result)
+            .unwrap()
+            .as_ref()
+            .try_into()
+            .unwrap();
 
         // Output to console
         println!("Input text: {}", text);
-        println!("BINARY size: {}", char_count);
+        println!("Result: {}", result_as_inspect);
     }
 }
