@@ -42,6 +42,17 @@ unsafe extern "C" {
     fn systemMessage(msg: *const c_char);
 }
 
+/// Wrapper function for systemMessage that accepts any type implementing Into<String>
+#[cfg(target_arch = "wasm32")]
+fn system_message(msg: impl Into<String>) {
+    unsafe {
+        let msg_string = msg.into();
+        let c_msg = std::ffi::CString::new(msg_string)
+            .unwrap_or_else(|_| std::ffi::CString::new("(conversion error)").unwrap());
+        systemMessage(c_msg.as_ptr());
+    }
+}
+
 #[derive(Debug)]
 pub struct MRubyCompiler2Error {
     details: String,
@@ -131,7 +142,8 @@ impl Drop for MRubyCompiler2Context {
 }
 
 fn main() {
-    println!("Initialized!");
+    #[cfg(target_arch = "wasm32")]
+    system_message("Environment initialized!");
 }
 
 // Function called from JavaScript
@@ -150,6 +162,7 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char) {
             Ok(bytecode) => bytecode,
             Err(e) => {
                 eprintln!("Compilation error: {}", e);
+                eprintln!("Please check your Ruby code and try again");
                 return;
             }
         };
@@ -192,12 +205,7 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char) {
 
         // Output result using JavaScript callback
         #[cfg(target_arch = "wasm32")]
-        {
-            let msg = std::ffi::CString::new(format!("Result: {}", result_as_inspect))
-                .unwrap_or_else(|_| std::ffi::CString::new("Result: (conversion error)").unwrap());
-            systemMessage(msg.as_ptr());
-        }
-
+        system_message(format!("Result: {}", result_as_inspect));
         #[cfg(not(target_arch = "wasm32"))]
         println!("Result: {}", result_as_inspect);
     }

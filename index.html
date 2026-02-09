@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mruby Playground</title>
+    <title>mruby/edge Playground</title>
     <style>
         * {
             margin: 0;
@@ -188,13 +188,34 @@
         #console::-webkit-scrollbar-thumb:hover {
             background: #4c4c4c;
         }
+
+        .footer {
+            max-width: 1200px;
+            margin: 20px auto 0;
+            padding: 20px 30px;
+            text-align: center;
+            color: #d4d4d4;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: #569cd6;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .footer a:hover {
+            color: #4ec9b0;
+            text-decoration: underline;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔷 mruby/edge Playground</h1>
+            <h1>💻 mruby/edge Playground</h1>
             <div class="subtitle">Write and execute mruby code in your browser</div>
         </div>
 
@@ -216,6 +237,11 @@
             </div>
         </div>
     </div>
+
+    <footer class="footer">
+        <p>Powered by <a href="https://github.com/mrubyedge/mrubyedge" target="_blank"
+                rel="noopener noreferrer">mruby/edge</a></p>
+    </footer>
 
     <script>
         const consoleDiv = document.getElementById('console');
@@ -266,8 +292,6 @@
                         return;
                     }
 
-                    // Clear previous output
-                    clearConsole();
                     appendToConsole('Executing mruby script...', 'system');
 
                     // Call Rust function
