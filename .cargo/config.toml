@@ -8,4 +8,6 @@ rustflags = [
     "link-args=-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
     "-C",
     "link-args=-s MODULARIZE=0",
+    "-C",
+    "link-args=--js-library library.js",
 ]

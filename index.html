@@ -246,17 +246,17 @@
             preRun: [],
             postRun: [],
             print: function (text) {
-                // Check if it's a result message
-                if (text.startsWith('[RESULT] ')) {
-                    const result = text.substring(9);
-                    appendToConsole(`Result: ${result}`, 'system');
-                } else {
-                    appendToConsole(text, 'output');
-                }
+                console.log(text);
+                appendToConsole(text, 'output');
             },
             printErr: function (text) {
                 console.error(text);
                 appendToConsole(text, 'error');
+            },
+            systemMessage: function (msgPtr) {
+                const msg = UTF8ToString(msgPtr);
+                console.info(msg);
+                appendToConsole(msg, 'system');
             },
             onRuntimeInitialized: function () {
                 document.getElementById('runButton').addEventListener('click', function () {

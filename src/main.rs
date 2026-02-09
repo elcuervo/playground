@@ -36,6 +36,12 @@ use bindings::{
 };
 use mrubyedge::yamrb::helpers::mrb_call_inspect;
 
+// JavaScript callback for system messages
+#[cfg(target_arch = "wasm32")]
+unsafe extern "C" {
+    fn systemMessage(msg: *const c_char);
+}
+
 #[derive(Debug)]
 pub struct MRubyCompiler2Error {
     details: String,
@@ -184,7 +190,15 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char) {
             }
         };
 
-        // Output result as system message (with special prefix for JavaScript to parse)
-        println!("[RESULT] {}", result_as_inspect);
+        // Output result using JavaScript callback
+        #[cfg(target_arch = "wasm32")]
+        {
+            let msg = std::ffi::CString::new(format!("Result: {}", result_as_inspect))
+                .unwrap_or_else(|_| std::ffi::CString::new("Result: (conversion error)").unwrap());
+            systemMessage(msg.as_ptr());
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        println!("Result: {}", result_as_inspect);
     }
 }
