@@ -2,11 +2,6 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-// Execute JavaScript using Emscripten functions
-unsafe extern "C" {
-    fn emscripten_run_script(script: *const c_char);
-}
-
 use std::ptr::null_mut;
 
 mod bindings {
@@ -130,40 +125,66 @@ impl Drop for MRubyCompiler2Context {
 }
 
 fn main() {
-    // Method 1: Use println! (Emscripten automatically redirects to console.log)
-    println!("Hello, world from Rust!");
-
-    // Method 2: Execute JS directly to call console.log
-    unsafe {
-        let script = "console.log('Hello from Rust via emscripten_run_script!');\0";
-        emscripten_run_script(script.as_ptr() as *const c_char);
-    }
+    println!("Initialized!");
 }
 
 // Function called from JavaScript
-// Receives form text, counts characters, and outputs to console
+// Receives Ruby script, executes it, and outputs the result
 #[unsafe(no_mangle)]
-pub extern "C" fn count_chars(text_ptr: *const c_char) {
+pub extern "C" fn load_ruby_script(text_ptr: *const c_char) {
     unsafe {
         // Convert C string to Rust string
         let c_str = CStr::from_ptr(text_ptr);
         let text = c_str.to_str().unwrap_or("");
 
         let mut context = MRubyCompiler2Context::new();
-        let mrb = context.compile(text).unwrap();
 
-        let mut rite = mrubyedge::rite::load(&mrb).unwrap();
+        // Compile the Ruby script
+        let mrb = match context.compile(text) {
+            Ok(bytecode) => bytecode,
+            Err(e) => {
+                eprintln!("Compilation error: {}", e);
+                return;
+            }
+        };
+
+        // Load and execute the bytecode
+        let mut rite = match mrubyedge::rite::load(&mrb) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Failed to load bytecode: {:?}", e);
+                return;
+            }
+        };
+
         let mut vm = mrubyedge::yamrb::vm::VM::open(&mut rite);
         mruby_serde_json::init_json(&mut vm);
-        let result = vm.run().unwrap();
-        let result_as_inspect: String = mrb_call_inspect(&mut vm, result)
-            .unwrap()
-            .as_ref()
-            .try_into()
-            .unwrap();
 
-        // Output to console
-        println!("Input text: {}", text);
-        println!("Result: {}", result_as_inspect);
+        // Execute the script and handle exceptions
+        let result = match vm.run() {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Runtime error: {:?}", e);
+                return;
+            }
+        };
+
+        // Convert result to inspect string
+        let result_as_inspect: String = match mrb_call_inspect(&mut vm, result) {
+            Ok(inspect_value) => match inspect_value.as_ref().try_into() {
+                Ok(s) => s,
+                Err(_) => {
+                    eprintln!("Failed to convert inspect result to string");
+                    return;
+                }
+            },
+            Err(e) => {
+                eprintln!("Failed to call inspect: {:?}", e);
+                return;
+            }
+        };
+
+        // Output result as system message (with special prefix for JavaScript to parse)
+        println!("[RESULT] {}", result_as_inspect);
     }
 }
