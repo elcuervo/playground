@@ -1,3 +1,7 @@
 /target
 *.wasm
 playground.js
+
+# Allow build outputs in docs/ for GitHub Pages
+!docs/*.wasm
+!docs/*.js

@@ -15,3 +15,10 @@ mruby-serde-json = "0.1.0"
 bindgen = ">= 0"
 cc = ">= 1"
 glob = ">= 0"
+
+[profile.release]
+opt-level = "z"        # Optimize for size
+lto = true              # Enable Link Time Optimization
+codegen-units = 1       # Better optimization with single codegen unit
+strip = true            # Strip symbols
+panic = "abort"         # Reduce panic handling overhead

@@ -1,7 +1,7 @@
 [target.wasm32-unknown-emscripten]
 rustflags = [
     "-C",
-    "link-args=-o playground.js",
+    "link-args=-o docs/playground.js",
     "-C",
     "link-args=-s EXPORTED_FUNCTIONS=['_load_ruby_script','_main']",
     "-C",
@@ -10,4 +10,16 @@ rustflags = [
     "link-args=-s MODULARIZE=0",
     "-C",
     "link-args=--js-library library.js",
+    "-C",
+    "link-args=-s ALLOW_MEMORY_GROWTH=1",
+    "-C",
+    "link-args=-s INITIAL_MEMORY=16777216",
+    "-C",
+    "link-args=-s FILESYSTEM=0",
+    "-C",
+    "link-args=-s ASSERTIONS=0",
+    "-C",
+    "link-args=-flto",
+    "-C",
+    "link-args=-Oz",
 ]
