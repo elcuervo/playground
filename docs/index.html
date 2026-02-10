@@ -198,17 +198,20 @@
             color: #569cd6;
             margin: 2px 0;
             font-weight: 500;
+            white-space: pre;
         }
 
         .console-output {
             color: #4ec9b0;
             margin: 2px 0;
+            white-space: pre;
         }
 
         .console-error {
             color: #f48771;
             margin: 2px 0;
             font-weight: 500;
+            white-space: pre;
         }
 
         .console-prompt {
@@ -271,6 +274,7 @@
                     <option value="hello">Hello World</option>
                     <option value="fibonacci">Fibonacci Numbers</option>
                     <option value="hanoi">Tower of Hanoi</option>
+                    <option value="sine">Sine Curve</option>
                     <option value="janken">Janken Game</option>
                     <option value="json">JSON Parse Sample</option>
                 </select>
@@ -324,24 +328,84 @@ end`,
             hanoi: `# Tower of Hanoi
 # Move disks from source to destination using auxiliary peg
 
-def hanoi(n, source, destination, auxiliary, step = [0])
+def print_state(state)
+  puts "  A: #{state['A'].empty? ? '[]' : state['A'].inspect}"
+  puts "  B: #{state['B'].empty? ? '[]' : state['B'].inspect}"
+  puts "  C: #{state['C'].empty? ? '[]' : state['C'].inspect}"
+end
+
+def hanoi(n, source, destination, auxiliary, state, step = [0])
   if n == 1
     step[0] += 1
-    puts "Step #{step[0]}: Move disk 1 from #{source} to #{destination}"
+    disk = state[source].pop
+    state[destination].push(disk)
+    puts "Step #{step[0]}: Move disk #{disk} from #{source} to #{destination}"
+    print_state(state)
+    puts ""
     return
   end
   
-  hanoi(n - 1, source, auxiliary, destination, step)
+  hanoi(n - 1, source, auxiliary, destination, state, step)
   step[0] += 1
-  puts "Step #{step[0]}: Move disk #{n} from #{source} to #{destination}"
-  hanoi(n - 1, auxiliary, destination, source, step)
+  disk = state[source].pop
+  state[destination].push(disk)
+  puts "Step #{step[0]}: Move disk #{disk} from #{source} to #{destination}"
+  print_state(state)
+  puts ""
+  hanoi(n - 1, auxiliary, destination, source, state, step)
 end
 
 puts "Tower of Hanoi with 3 disks:"
 puts "----------------------------"
-hanoi(3, 'A', 'C', 'B')
+puts "Initial state:"
+state = {'A' => [3, 2, 1], 'B' => [], 'C' => []}
+print_state(state)
+puts ""
+hanoi(3, 'A', 'C', 'B', state)
 puts "----------------------------"
 puts "Complete!"`,
+
+            sine: `# Sine curve ASCII art
+# Draw sine wave from 0 to 4π
+
+PI = Math::PI
+
+# Settings
+width = 60        # Width of the graph
+x_range = 4.to_f * PI  # 0 to 4π
+steps = 80        # Number of points to plot
+
+puts "Sin(x) curve from 0 to 4π"
+puts "=" * width
+puts ""
+
+# Draw the curve
+(0..steps).each do |i|
+  x = (x_range * i) / steps
+  y = Math.sin(x)
+  
+  # Map y (-1 to 1) to column position (0 to width-1)
+  col = ((y + 1) * (width - 1) / 2).to_i
+  
+  # Add x-axis marker at y=0
+  line = if y.abs < 0.1
+    " " * col + "|"
+  else
+    " " * col + "*"
+  end
+  
+  # Show x value at specific points
+  if i % 20 == 0
+    x_label = (x / PI * 10).to_i / 10.0
+    puts line + "  (x=#{x_label}π)"
+  else
+    puts line
+  end
+end
+
+puts ""
+puts "=" * width
+puts "Legend: * = sin(x), | = x-axis (y≈0)"`,
 
             janken: `# Janken (Rock-Paper-Scissors) Game
 # Simulated game between two players

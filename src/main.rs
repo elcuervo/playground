@@ -178,6 +178,7 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char) {
 
         let mut vm = mrubyedge::yamrb::vm::VM::open(&mut rite);
         mruby_serde_json::init_json(&mut vm);
+        mruby_math::init_math(&mut vm);
 
         // Execute the script and handle exceptions
         let result = match vm.run() {
