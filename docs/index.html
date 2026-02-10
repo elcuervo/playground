@@ -76,6 +76,34 @@
             display: block;
         }
 
+        .editor-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        #presetSelect {
+            padding: 8px 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 13px;
+            background: #252526;
+            color: #d4d4d4;
+            border: 2px solid #3c3c3c;
+            border-radius: 6px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #presetSelect:hover {
+            border-color: #007acc;
+        }
+
+        #presetSelect:focus {
+            border-color: #007acc;
+        }
+
         #codeInput {
             width: 100%;
             height: 300px;
@@ -236,7 +264,17 @@
         </div>
 
         <div class="editor-panel">
-            <label for="codeInput">💎 Ruby Code:</label>
+            <div class="editor-controls">
+                <label for="codeInput">💎 Ruby Code:</label>
+                <select id="presetSelect">
+                    <option value="">-- Load Sample Code --</option>
+                    <option value="hello">Hello World</option>
+                    <option value="fibonacci">Fibonacci Numbers</option>
+                    <option value="hanoi">Tower of Hanoi</option>
+                    <option value="janken">Janken Game</option>
+                    <option value="json">JSON Parse Sample</option>
+                </select>
+            </div>
             <textarea id="codeInput"
                 placeholder="# Enter your mruby code here&#x0a;puts 'Hello, mruby!'&#x0a;&#x0a;x = [1, 2, 3, 4, 5]&#x0a;x.map { |n| n * 2 }">puts 'Hello, mruby!'
 [1, 2, 3].map { |x| x * 2 }</textarea>
@@ -261,6 +299,139 @@
 
     <script>
         const consoleDiv = document.getElementById('console');
+        const codeInput = document.getElementById('codeInput');
+        const presetSelect = document.getElementById('presetSelect');
+
+        // Sample code presets
+        const presets = {
+            hello: `# Hello World
+puts "Hello, World!"
+puts "Welcome to mruby/edge Playground!"`,
+
+            fibonacci: `# Fibonacci Numbers
+# Calculate first 15 Fibonacci numbers
+
+def fibonacci(n)
+  return n if n <= 1
+  fibonacci(n - 1) + fibonacci(n - 2)
+end
+
+puts "Fibonacci sequence:"
+15.times do |i|
+  puts "fib(#{i}) = #{fibonacci(i)}"
+end`,
+
+            hanoi: `# Tower of Hanoi
+# Move disks from source to destination using auxiliary peg
+
+def hanoi(n, source, destination, auxiliary, step = [0])
+  if n == 1
+    step[0] += 1
+    puts "Step #{step[0]}: Move disk 1 from #{source} to #{destination}"
+    return
+  end
+  
+  hanoi(n - 1, source, auxiliary, destination, step)
+  step[0] += 1
+  puts "Step #{step[0]}: Move disk #{n} from #{source} to #{destination}"
+  hanoi(n - 1, auxiliary, destination, source, step)
+end
+
+puts "Tower of Hanoi with 3 disks:"
+puts "----------------------------"
+hanoi(3, 'A', 'C', 'B')
+puts "----------------------------"
+puts "Complete!"`,
+
+            janken: `# Janken (Rock-Paper-Scissors) Game
+# Simulated game between two players
+
+class JankenGame
+  HANDS = ['Rock', 'Paper', 'Scissors']
+  
+  def self.play_round
+    player1 = HANDS[rand(HANDS.size)]
+    player2 = HANDS[rand(HANDS.size)]
+    
+    puts "Player 1: #{player1}"
+    puts "Player 2: #{player2}"
+    
+    result = judge(player1, player2)
+    puts "Result: #{result}"
+    puts ""
+    result
+  end
+  
+  def self.judge(hand1, hand2)
+    return "Draw!" if hand1 == hand2
+    
+    wins = {
+      'Rock' => 'Scissors',
+      'Paper' => 'Rock',
+      'Scissors' => 'Paper'
+    }
+    
+    wins[hand1] == hand2 ? "Player 1 wins!" : "Player 2 wins!"
+  end
+end
+
+puts "=== Janken Game ==="
+puts ""
+
+# Play 5 rounds
+5.times do |i|
+  puts "Round #{i + 1}:"
+  JankenGame.play_round
+end`,
+
+            json: `# JSON Parse Sample
+# Demonstrates JSON parsing with mruby-serde-json
+
+# Sample JSON data
+json_string = '{
+  "name": "mruby/edge",
+  "version": "1.1.0",
+  "features": ["WASI", "Regexp", "Random"],
+  "stats": {
+    "stars": 100,
+    "active": true
+  }
+}'
+
+puts "Original JSON:"
+puts json_string
+puts ""
+
+# Parse JSON
+data = JSON.parse(json_string)
+
+puts "Parsed data:"
+puts "Name: #{data['name']}"
+puts "Version: #{data['version']}"
+puts "Features: #{data['features'].join(', ')}"
+puts "Stars: #{data['stats']['stars']}"
+puts "Active: #{data['stats']['active']}"
+puts ""
+
+# Create and stringify JSON
+new_data = {
+  'message' => 'Hello from mruby!',
+  'numbers' => [1, 2, 3, 4, 5]
+}
+
+puts "New JSON:"
+puts JSON.generate(new_data)`
+        };
+
+        // Handle preset selection
+        presetSelect.addEventListener('change', function () {
+            const selectedPreset = presets[this.value];
+            if (selectedPreset) {
+                codeInput.value = selectedPreset;
+            }
+            // Reset select to placeholder
+            this.value = '';
+        });
 
         function appendToConsole(text, type = 'output') {
             const line = document.createElement('div');
