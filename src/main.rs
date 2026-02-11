@@ -146,6 +146,64 @@ fn main() {
     system_message("Environment initialized!");
 }
 
+/// Creates a VM on the fly and executes Ruby code to get the Ruby version
+/// Returns a pointer to a C string like "mruby/edge - v3.3.0"
+/// The returned string should be read with UTF8ToString() in JavaScript
+#[unsafe(no_mangle)]
+pub extern "C" fn show_ruby_version() -> *const c_char {
+    let code = "\"#{RUBY_ENGINE} - v#{RUBY_VERSION}\"";
+
+    let mut context = MRubyCompiler2Context::new();
+
+    // Compile the Ruby script
+    let mrb = match context.compile(code) {
+        Ok(bytecode) => bytecode,
+        Err(e) => {
+            let error_msg = format!("! Compilation error: {}", e);
+            return std::ffi::CString::new(error_msg)
+                .unwrap_or_else(|_| std::ffi::CString::new("Compilation error").unwrap())
+                .into_raw();
+        }
+    };
+
+    // Load and execute the bytecode
+    let mut rite = match mrubyedge::rite::load(&mrb) {
+        Ok(r) => r,
+        Err(e) => {
+            let error_msg = format!("! Failed to load bytecode: {:?}", e);
+            return std::ffi::CString::new(error_msg)
+                .unwrap_or_else(|_| std::ffi::CString::new("Bytecode load error").unwrap())
+                .into_raw();
+        }
+    };
+
+    let mut vm = mrubyedge::yamrb::vm::VM::open(&mut rite);
+
+    // Execute the script and handle exceptions
+    let result = match vm.run() {
+        Ok(r) => r,
+        Err(e) => {
+            let error_msg = format!("! Runtime error: {:?}", e);
+            return std::ffi::CString::new(error_msg)
+                .unwrap_or_else(|_| std::ffi::CString::new("! Runtime error").unwrap())
+                .into_raw();
+        }
+    };
+
+    // Convert result to string
+    let result_string: String = match result.as_ref().try_into() {
+        Ok(s) => s,
+        Err(e) => {
+            format!("! Type Mismatch {}", e)
+        }
+    };
+
+    // Convert to C string and return pointer
+    std::ffi::CString::new(result_string)
+        .unwrap_or_else(|_| std::ffi::CString::new("! conversion error").unwrap())
+        .into_raw()
+}
+
 // Function called from JavaScript
 // Receives Ruby script, executes it, and outputs the result
 #[unsafe(no_mangle)]

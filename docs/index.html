@@ -268,6 +268,11 @@
             margin: 0;
         }
 
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
         .release-notes-btn {
             background: #007acc;
             color: white;
@@ -282,6 +287,22 @@
 
         .release-notes-btn:hover {
             background: #005a9e;
+        }
+
+        .info-btn {
+            background: #4ec9b0;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .info-btn:hover {
+            background: #3da890;
         }
 
         .modal {
@@ -439,7 +460,13 @@
                 font-size: 13px;
             }
 
-            .release-notes-btn {
+            .header-buttons {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .release-notes-btn,
+            .info-btn {
                 width: 100%;
                 padding: 10px;
             }
@@ -525,7 +552,10 @@
                     <h1>💻 mruby/edge Playground</h1>
                     <div class="subtitle">Write and execute mruby code in your browser</div>
                 </div>
-                <button id="releaseNotesBtn" class="release-notes-btn">📺 Latest Releases</button>
+                <div class="header-buttons">
+                    <button id="infoBtn" class="info-btn">ℹ️ Version Info</button>
+                    <button id="releaseNotesBtn" class="release-notes-btn">📺 Latest Releases</button>
+                </div>
             </div>
         </div>
 
@@ -577,6 +607,19 @@
         </div>
     </div>
 
+    <!-- Version Info Modal -->
+    <div id="versionInfoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>ℹ️ Version Information</h2>
+                <button class="close-btn" id="closeVersionModal">&times;</button>
+            </div>
+            <div id="versionInfoContent">
+                <div class="loading">Loading version information...</div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const consoleDiv = document.getElementById('console');
         const codeInput = document.getElementById('codeInput');
@@ -587,6 +630,11 @@
         const releaseNotesModal = document.getElementById('releaseNotesModal');
         const closeModal = document.getElementById('closeModal');
         const releaseNotesContent = document.getElementById('releaseNotesContent');
+
+        // Version Info Modal
+        const versionInfoModal = document.getElementById('versionInfoModal');
+        const closeVersionModal = document.getElementById('closeVersionModal');
+        const versionInfoContent = document.getElementById('versionInfoContent');
 
         async function fetchReleaseNotes() {
             try {
@@ -643,6 +691,36 @@
             if (event.target === releaseNotesModal) {
                 releaseNotesModal.style.display = 'none';
             }
+            if (event.target === versionInfoModal) {
+                versionInfoModal.style.display = 'none';
+            }
+        });
+
+        // Version Info Button
+        const infoBtn = document.getElementById('infoBtn');
+        infoBtn.addEventListener('click', () => {
+            versionInfoModal.style.display = 'block';
+            try {
+                // Call show_ruby_version from WASM module
+                const version = Module.ccall(
+                    'show_ruby_version',
+                    'string',
+                    [],
+                    []
+                );
+                versionInfoContent.innerHTML = `
+                    <div class="release-item">
+                        <h3 class="release-title">Ruby Runtime</h3>
+                        <div class="release-body">${version}</div>
+                    </div>
+                `;
+            } catch (e) {
+                versionInfoContent.innerHTML = `<div class="error">Failed to get version info: ${e.message}</div>`;
+            }
+        });
+
+        closeVersionModal.addEventListener('click', () => {
+            versionInfoModal.style.display = 'none';
         });
 
         // Sample code presets
