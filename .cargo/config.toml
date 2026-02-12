@@ -22,4 +22,6 @@ rustflags = [
     "link-args=-flto",
     "-C",
     "link-args=-Oz",
+    "-C",
+    "link-args=-sSUPPORT_LONGJMP=wasm",
 ]
