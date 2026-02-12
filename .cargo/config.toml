@@ -3,7 +3,7 @@ rustflags = [
     "-C",
     "link-args=-o docs/playground.js",
     "-C",
-    "link-args=-s EXPORTED_FUNCTIONS=['_load_ruby_script','_show_ruby_version','_main']",
+    "link-args=-s EXPORTED_FUNCTIONS=['_load_ruby_script','_show_ruby_version','_compile_ruby_script','_main']",
     "-C",
     "link-args=-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
     "-C",
