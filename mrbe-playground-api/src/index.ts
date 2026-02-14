@@ -15,7 +15,7 @@ import mod from "./mrbe_playground_api_core.wasm";
  */
 
 /** A Durable Object's behavior is defined in an exported Javascript class */
-export class MrbePlaygroundApi extends DurableObject<Env> {
+export class MrbePlaygroundObject extends DurableObject<Env> {
 	/**
 	 * The constructor is invoked once upon creation of the Durable Object, i.e. the first call to
 	 * 	`DurableObjectStub::get` for a given identifier (no-op constructors can be omitted)
@@ -49,6 +49,17 @@ export default {
 	 * @returns The response to be sent back to the client
 	 */
 	async fetch(request, env, ctx): Promise<Response> {
+		// Create a stub to open a communication channel with the Durable Object
+		// instance named "foo".
+		//
+		// Requests from all Workers to the Durable Object instance named "foo"
+		// will go to a single remote Durable Object instance.
+		const stub = env.MRBE_PLAYGROUND_DATA.getByName("foo");
+
+		// Call the `sayHello()` RPC method on the stub to invoke the method on
+		// the remote Durable Object instance.
+		const greeting = await stub.sayHello("world");
+
 		const importObject = {
 			env: {
 				debug_console_log: (ptr, size) => {
@@ -66,17 +77,7 @@ export default {
 		const instance = await WebAssembly.instantiate(mod, importObject);
 		const exports = instance.exports;
 
-		// Create a stub to open a communication channel with the Durable Object
-		// instance named "foo".
-		//
-		// Requests from all Workers to the Durable Object instance named "foo"
-		// will go to a single remote Durable Object instance.
-		const stub = env.MRBE_PLAYGROUND_DATA.getByName("foo");
-
-		// Call the `sayHello()` RPC method on the stub to invoke the method on
-		// the remote Durable Object instance.
-		const greeting = await stub.sayHello("world");
-
+		// Process request
 		const reqResult = exports.uzumibi_initialize_request(65536);
 		const reqOffset = Number(reqResult & 0xFFFFFFFFn);
 		if (reqOffset === 0) {

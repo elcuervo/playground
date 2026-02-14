@@ -10,7 +10,7 @@
     "bindings": [
       {
         "name": "MRBE_PLAYGROUND_DATA",
-        "class_name": "MrbePlaygroundApi"
+        "class_name": "MrbePlaygroundObject"
       }
     ]
   },
@@ -18,7 +18,7 @@
     {
       "tag": "v1",
       "new_sqlite_classes": [
-        "MrbePlaygroundApi"
+        "MrbePlaygroundObject"
       ]
     }
   ]
