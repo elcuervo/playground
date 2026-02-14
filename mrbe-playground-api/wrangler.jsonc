@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mrbe-playground-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-30",
+  "observability": {
+    "enabled": true
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MRBE_PLAYGROUND_DATA",
+        "class_name": "MrbePlaygroundObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "MrbePlaygroundObject"
+      ]
+    }
+  ]
+}

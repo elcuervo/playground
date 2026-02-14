@@ -1,0 +1,16 @@
+{
+	"name": "mrbe-playground-api",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "cargo build --package mrbe-playground-api-core --target wasm32-unknown-unknown --release && cp -v ../target/wasm32-unknown-unknown/release/mrbe_playground_api_core.wasm ./src/ && wrangler dev",
+		"start": "wrangler dev",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260214.0",
+		"typescript": "^5.5.2",
+		"wrangler": "^4.65.0"
+	}
+}

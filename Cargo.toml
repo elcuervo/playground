@@ -23,3 +23,6 @@ lto = true        # Enable Link Time Optimization
 codegen-units = 1 # Better optimization with single codegen unit
 strip = true      # Strip symbols
 panic = "abort"   # Reduce panic handling overhead
+
+[workspace]
+members = ["mrbe-playground-api/wasm-app"]

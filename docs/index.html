@@ -124,8 +124,13 @@
             border-color: #007acc;
         }
 
-        #runButton {
+        .button-group {
+            display: flex;
+            gap: 10px;
             margin-top: 20px;
+        }
+
+        #runButton {
             padding: 12px 30px;
             font-size: 16px;
             font-weight: 600;
@@ -135,7 +140,6 @@
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.3s;
-            align-self: flex-start;
         }
 
         #runButton:hover {
@@ -146,6 +150,34 @@
 
         #runButton:active {
             transform: translateY(0);
+        }
+
+        #saveButton {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: #27ae60;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #saveButton:hover {
+            background: #229954;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+        }
+
+        #saveButton:active {
+            transform: translateY(0);
+        }
+
+        #saveButton:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .console-panel {
@@ -496,11 +528,12 @@
                 flex-direction: column;
                 gap: 10px;
                 padding: 10px 15px;
+                margin: 0;
             }
 
-            #runButton {
-                width: calc(100% - 30px);
-                margin: 20px 15px 15px;
+            #runButton,
+            #saveButton {
+                width: 100%;
             }
 
             .console-panel {
@@ -575,7 +608,10 @@
             <textarea id="codeInput"
                 placeholder="# Enter your mruby code here&#x0a;puts 'Hello, mruby!'&#x0a;&#x0a;x = [1, 2, 3, 4, 5]&#x0a;x.map { |n| n * 2 }">puts 'Hello, mruby!'
 [1, 2, 3].map { |x| x * 2 }</textarea>
-            <button id="runButton">▶ Run Code</button>
+            <div class="button-group">
+                <button id="runButton">▶ Run Code</button>
+                <button id="saveButton">💾 Save Code</button>
+            </div>
         </div>
 
         <div class="console-panel">
@@ -624,6 +660,101 @@
         const consoleDiv = document.getElementById('console');
         const codeInput = document.getElementById('codeInput');
         const presetSelect = document.getElementById('presetSelect');
+
+        // API Configuration
+        const API_BASE_URL = 'https://mrbe-playground-api.udzura.workers.dev';
+
+        // Generate random key
+        function generateRandomKey() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let key = '';
+            for (let i = 0; i < 12; i++) {
+                key += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return key;
+        }
+
+        // Save code to API
+        async function saveCode() {
+            const code = codeInput.value;
+            if (!code.trim()) {
+                appendToConsole('No code to save', 'error');
+                return;
+            }
+
+            const key = generateRandomKey();
+            const saveButton = document.getElementById('saveButton');
+
+            saveButton.disabled = true;
+            saveButton.textContent = '💾 Saving...';
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('key', key);
+                formData.append('value', code);
+
+                const response = await fetch(`${API_BASE_URL}/kv`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData.toString()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // Update URL without reload
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('key', key);
+                window.history.pushState({}, '', newUrl);
+
+                appendToConsole(`Code saved! Share this URL: ${newUrl.href}`, 'system');
+            } catch (error) {
+                appendToConsole(`Failed to save code: ${error.message}`, 'error');
+            } finally {
+                saveButton.disabled = false;
+                saveButton.textContent = '💾 Save Code';
+            }
+        }
+
+        // Load code from API
+        async function loadCode(key) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/kv?key=${encodeURIComponent(key)}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.value) {
+                    codeInput.value = result.value;
+                    appendToConsole(`Code loaded from key: ${key}`, 'system');
+                } else {
+                    appendToConsole(`No code found for key: ${key}`, 'error');
+                }
+            } catch (error) {
+                appendToConsole(`Failed to load code: ${error.message}`, 'error');
+            }
+        }
+
+        // Check URL for key parameter on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const key = urlParams.get('key');
+
+            if (key) {
+                loadCode(key);
+            }
+        });
+
+        // Save button event listener
+        document.getElementById('saveButton').addEventListener('click', saveCode);
 
         // Release Notes Modal
         const releaseNotesBtn = document.getElementById('releaseNotesBtn');
