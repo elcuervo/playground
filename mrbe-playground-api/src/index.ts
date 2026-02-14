@@ -66,6 +66,20 @@ export default {
 		if (path === "/favicon.ico") {
 			return new Response(null, { status: 404 });
 		}
+
+		// Handle CORS preflight for /kv endpoint
+		if (path === "/kv" && request.method === "OPTIONS") {
+			return new Response(null, {
+				status: 204,
+				headers: {
+					"Access-Control-Allow-Origin": "https://mrubyedge.github.io",
+					"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+					"Access-Control-Allow-Headers": "Content-Type",
+					"Access-Control-Max-Age": "86400"
+				}
+			});
+		}
+
 		const query = new URL(request.url).searchParams;
 
 		// Create a stub to open a communication channel with the Durable Object
