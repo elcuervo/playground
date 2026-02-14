@@ -1,6 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import mod from "./mrbe_playground_api_core.wasm";
 
+// Type declaration for WebAssembly module import
+const wasmModule: WebAssembly.Module = mod as WebAssembly.Module;
+
 /**
  * Welcome to Cloudflare Workers! This is your first Durable Objects application.
  *
@@ -28,14 +31,24 @@ export class MrbePlaygroundObject extends DurableObject<Env> {
 	}
 
 	/**
-	 * The Durable Object exposes an RPC method sayHello which will be invoked when a Durable
-	 *  Object instance receives a request from a Worker via the same method invocation on the stub
+	 * Get a value from Durable Object storage
 	 *
-	 * @param name - The name provided to a Durable Object instance from a Worker
-	 * @returns The greeting to be sent back to the Worker
+	 * @param key - The key to retrieve
+	 * @returns The value associated with the key, or null if not found
 	 */
-	async sayHello(name: string): Promise<string> {
-		return `Hello, ${name}!`;
+	async get(key: string): Promise<string | null> {
+		const value = await this.ctx.storage.get<string>(key);
+		return value ?? null;
+	}
+
+	/**
+	 * Set a value in Durable Object storage
+	 *
+	 * @param key - The key to store
+	 * @param value - The value to store
+	 */
+	async set(key: string, value: string): Promise<void> {
+		await this.ctx.storage.put(key, value);
 	}
 }
 
@@ -49,6 +62,12 @@ export default {
 	 * @returns The response to be sent back to the client
 	 */
 	async fetch(request, env, ctx): Promise<Response> {
+		const path = new URL(request.url).pathname;
+		if (path === "/favicon.ico") {
+			return new Response(null, { status: 404 });
+		}
+		const query = new URL(request.url).searchParams;
+
 		// Create a stub to open a communication channel with the Durable Object
 		// instance named "foo".
 		//
@@ -56,25 +75,71 @@ export default {
 		// will go to a single remote Durable Object instance.
 		const stub = env.MRBE_PLAYGROUND_DATA.getByName("foo");
 
-		// Call the `sayHello()` RPC method on the stub to invoke the method on
-		// the remote Durable Object instance.
-		const greeting = await stub.sayHello("world");
+		// Storage operations buffer for async processing
+		const pendingOperations: Array<{ type: 'set', key: string, value: string } | { type: 'get', key: string, resolve: (value: string | null) => void }> = [];
+		const cachedValues = new Map<string, string | null>();
+
+		const key = query.get("key");
+		if (request.method === "GET" && key) {
+			// preflight get value and cache it to avoid round-trip during request processing
+			const value = await stub.get(key);
+			cachedValues.set(key, value);
+			console.log(`[Preflight] GET ${key} => ${value}`);
+		}
+
+		// Create decoder/encoder once for reuse
+		const decoder = new TextDecoder();
+		const encoder = new TextEncoder();
 
 		const importObject = {
 			env: {
-				debug_console_log: (ptr, size) => {
+				debug_console_log: (ptr: number, size: number) => {
 					const memory = exports.memory;
-					let str = "";
-					const buffer = new Uint8Array(memory.buffer);
-					for (let i = ptr; i < ptr + size; i++) {
-						str += String.fromCharCode(buffer[i]);
+					const buffer = new Uint8Array(memory.buffer, ptr, size);
+					console.log(`[debug]: ${decoder.decode(buffer)}`);
+					return 0;
+				},
+				// Get a value from cache and write to WebAssembly memory
+				// Returns the length of the value, or -1 if not found
+				// Value is written to the buffer at resultPtr
+				do_storage_get: (keyPtr: number, keySize: number, resultPtr: number, resultMaxSize: number): number => {
+					const memory = exports.memory;
+					const keyBuffer = new Uint8Array(memory.buffer, keyPtr, keySize);
+					const key = decoder.decode(keyBuffer);
+
+					// Check if we have a cached value
+					if (cachedValues.has(key)) {
+						const value = cachedValues.get(key);
+						if (value === null) {
+							return -1;
+						}
+						const valueBytes = encoder.encode(value);
+						const resultBuffer = new Uint8Array(memory.buffer, resultPtr, resultMaxSize);
+						const length = Math.min(valueBytes.length, resultMaxSize);
+						resultBuffer.set(valueBytes.slice(0, length));
+						return length;
 					}
-					console.log(`[debug]: ${str}`);
+
+					// Value not in cache, return -1
+					return -1;
+				},
+				// Set a value in Durable Object storage (buffered)
+				do_storage_set: (keyPtr: number, keySize: number, valuePtr: number, valueSize: number): number => {
+					const memory = exports.memory;
+					const keyBuffer = new Uint8Array(memory.buffer, keyPtr, keySize);
+					const key = decoder.decode(keyBuffer);
+					const valueBuffer = new Uint8Array(memory.buffer, valuePtr, valueSize);
+					const value = decoder.decode(valueBuffer);
+
+					// Buffer the operation for async execution
+					pendingOperations.push({ type: 'set', key, value });
+					// Update cache
+					cachedValues.set(key, value);
 					return 0;
 				},
 			},
 		};
-		const instance = await WebAssembly.instantiate(mod, importObject);
+		const instance = await WebAssembly.instantiate(wasmModule, importObject);
 		const exports = instance.exports;
 
 		// Process request
@@ -82,24 +147,16 @@ export default {
 		const reqOffset = Number(reqResult & 0xFFFFFFFFn);
 		if (reqOffset === 0) {
 			const errOffset = Number((reqResult >> 32n) & 0xFFFFFFFFn);
-			const decoder = new TextDecoder();
-			let errStr = "";
 			const buffer = new Uint8Array(exports.memory.buffer, errOffset);
+			let errStr = "";
 			for (let i = 0; buffer[i] !== 0; i++) {
 				errStr += String.fromCharCode(buffer[i]);
 			}
 			throw new Error(`Failed to initialize request: ${errStr}`);
 		}
 		const requestBuffer = new Uint8Array(exports.memory.buffer, reqOffset, 65536);
-		const path = new URL(request.url).pathname;
-		if (path === "/favicon.ico") {
-			return new Response(null, { status: 404 });
-		}
-
-		const query = new URL(request.url).searchParams;
 
 		let pos = 0;
-		const encoder = new TextEncoder();
 		const dataView = new DataView(exports.memory.buffer, reqOffset);
 
 		const method = encoder.encode(request.method);
@@ -127,8 +184,8 @@ export default {
 		pos += queryBytes.length;
 
 		// Headers
-		const headers = [];
-		request.headers.forEach((value, key) => {
+		const headers: { key: string; value: string; }[] = [];
+		request.headers.forEach((value: string, key: string) => {
 			// 一般的なヘッダーのみ含める（必要に応じて調整）
 			if (key.toLowerCase() !== 'cf-connecting-ip' &&
 				key.toLowerCase() !== 'cf-ray' &&
@@ -179,9 +236,8 @@ export default {
 		const resOffset = Number(resResult & 0xFFFFFFFFn);
 		if (resOffset === 0) {
 			const errOffset = Number((resResult >> 32n) & 0xFFFFFFFFn);
-			const decoder = new TextDecoder();
-			let errStr = "";
 			const buffer = new Uint8Array(exports.memory.buffer, errOffset);
+			let errStr = "";
 			for (let i = 0; buffer[i] !== 0; i++) {
 				errStr += String.fromCharCode(buffer[i]);
 			}
@@ -189,7 +245,6 @@ export default {
 		}
 
 		// Unpack response
-		const decoder = new TextDecoder();
 		const resDataView = new DataView(exports.memory.buffer, resOffset);
 
 
@@ -235,6 +290,16 @@ export default {
 		// Body
 		const bodyBuffer = new Uint8Array(exports.memory.buffer, resOffset + resPos, bodySize);
 		const responseText = decoder.decode(bodyBuffer);
+
+		// Execute all pending storage operations
+		for (const op of pendingOperations) {
+			if (op.type === 'set') {
+				await stub.set(op.key, op.value);
+			} else if (op.type === 'get') {
+				const value = await stub.get(op.key);
+				op.resolve(value);
+			}
+		}
 
 		return new Response(responseText, { status: statusCode, headers: responseHeaders });
 	},

@@ -7,8 +7,8 @@ use std::{mem::MaybeUninit, rc::Rc};
 use mrubyedge::{
     rite::rite,
     yamrb::{
-        helpers::{mrb_define_cmethod, mrb_funcall},
-        value::{RObject, RValue},
+        helpers::{mrb_define_class_cmethod, mrb_define_cmethod, mrb_funcall},
+        value::{RModule, RObject, RValue},
         vm::VM,
     },
 };
@@ -32,11 +32,62 @@ fn set_error_to_buf(message: impl AsRef<str>) -> *const u8 {
 
 unsafe extern "C" {
     unsafe fn debug_console_log(ptr: *const u8, len: usize);
+    unsafe fn do_storage_get(
+        key_ptr: *const u8,
+        key_size: usize,
+        result_ptr: *mut u8,
+        result_max_size: usize,
+    ) -> i32;
+    unsafe fn do_storage_set(
+        key_ptr: *const u8,
+        key_size: usize,
+        value_ptr: *const u8,
+        value_size: usize,
+    ) -> i32;
 }
 
 fn debug_console_log_internal(message: &str) {
     unsafe {
         debug_console_log(message.as_ptr(), message.len());
+    }
+}
+
+/// Get a value from Durable Object storage cache
+/// Returns Ok(Some(value)) if found, Ok(None) if not found
+/// The buffer size is limited to 64KB
+fn storage_get(key: &str) -> Result<Option<String>, String> {
+    const BUFFER_SIZE: usize = 65536;
+    let mut buffer = vec![0u8; BUFFER_SIZE];
+
+    unsafe {
+        let result = do_storage_get(key.as_ptr(), key.len(), buffer.as_mut_ptr(), BUFFER_SIZE);
+
+        match result {
+            -1 => Ok(None), // Not found
+            len if len >= 0 => {
+                let len = len as usize;
+                let value = String::from_utf8(buffer[..len].to_vec())
+                    .map_err(|e| format!("Failed to decode UTF-8: {}", e))?;
+                Ok(Some(value))
+            }
+            _ => Err(format!(
+                "Unexpected return value from do_storage_get: {}",
+                result
+            )),
+        }
+    }
+}
+
+/// Set a value in Durable Object storage
+/// The operation is buffered and will be executed after the request completes
+fn storage_set(key: &str, value: &str) -> Result<(), String> {
+    unsafe {
+        let result = do_storage_set(key.as_ptr(), key.len(), value.as_ptr(), value.len());
+
+        match result {
+            0 => Ok(()),
+            _ => Err(format!("Failed to set value: return code {}", result)),
+        }
     }
 }
 
@@ -53,6 +104,46 @@ fn uzumibi_kernel_debug_console_log(
     Ok(RObject::nil().to_refcount_assigned())
 }
 
+fn uzumibi_kv_class_get(
+    vm: &mut VM,
+    args: &[Rc<RObject>],
+) -> Result<Rc<RObject>, mrubyedge::Error> {
+    let key_obj = &args[0];
+    let key = mrb_funcall(vm, key_obj.clone().into(), "to_s", &[])?;
+    let key: String = key.as_ref().try_into()?;
+
+    match storage_get(&key) {
+        Ok(Some(value)) => {
+            let value = RObject::string(value);
+            Ok(value.to_refcount_assigned())
+        }
+        Ok(None) => Ok(RObject::nil().to_refcount_assigned()),
+        Err(e) => Err(mrubyedge::Error::RuntimeError(format!(
+            "Failed to access storage value: {}",
+            e
+        ))),
+    }
+}
+
+fn uzumibi_kv_class_set(
+    vm: &mut VM,
+    args: &[Rc<RObject>],
+) -> Result<Rc<RObject>, mrubyedge::Error> {
+    let key_obj = &args[0];
+    let key = mrb_funcall(vm, key_obj.clone().into(), "to_s", &[])?;
+    let key: String = key.as_ref().try_into()?;
+
+    let value_obj = &args[1];
+    let value = mrb_funcall(vm, value_obj.clone().into(), "to_s", &[])?;
+    let value: String = value.as_ref().try_into()?;
+
+    storage_set(&key, &value).map_err(|e| {
+        mrubyedge::Error::RuntimeError(format!("Failed to set storage value: {}", e))
+    })?;
+
+    Ok(RObject::boolean(true).to_refcount_assigned())
+}
+
 fn init_vm() -> Result<VM, mrubyedge::Error> {
     let mut rite = rite::load(MRB)
         .map_err(|e| mrubyedge::Error::RuntimeError(format!("Failed to load mruby: {:?}", e)))?;
@@ -62,10 +153,20 @@ fn init_vm() -> Result<VM, mrubyedge::Error> {
     let object = vm.object_class.clone();
     mrb_define_cmethod(
         &mut vm,
-        object,
+        object.clone(),
         "debug_console",
         Box::new(uzumibi_kernel_debug_console_log),
     );
+
+    let uzumibi_module = vm.get_module_by_name("Uzumibi");
+    let kv_class = vm.define_class("KV", None, Some(uzumibi_module));
+    mrb_define_class_cmethod(
+        &mut vm,
+        kv_class.clone(),
+        "get",
+        Box::new(uzumibi_kv_class_get),
+    );
+    mrb_define_class_cmethod(&mut vm, kv_class, "set", Box::new(uzumibi_kv_class_set));
 
     vm.run()
         .map_err(|e| mrubyedge::Error::RuntimeError(format!("Failed to init VM: {:?}", e)))?;
