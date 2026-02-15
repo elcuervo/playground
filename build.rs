@@ -29,12 +29,17 @@ fn main() {
         .compile("mrubycompiler2");
 
     println!("cargo:rustc-link-lib=mrubycompiler2");
+    let emsdk_path = std::env::var("EMSDK").expect("EMSDK environment variable is not set");
+
     let bindings = bindgen::Builder::default()
         .header("./vendor/mruby-compiler2/include/mruby_compiler.h")
         .header("./vendor/mruby-compiler2/include/mrc_codedump.h")
         .clang_arg("-I./vendor/mruby-compiler2/include")
         .clang_arg("-I./vendor/mruby-compiler2/lib/prism/include")
-        .clang_arg("-I/opt/homebrew/Cellar/emscripten/5.0.0/libexec/cache/sysroot/include")
+        .clang_arg(format!(
+            "-I{}/upstream/emscripten/cache/sysroot/include",
+            emsdk_path
+        ))
         .blocklist_item("FP_NAN")
         .blocklist_item("FP_INFINITE")
         .blocklist_item("FP_ZERO")

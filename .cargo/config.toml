@@ -23,6 +23,8 @@ rustflags = [
     "-C",
     "link-args=-Oz",
     "-C",
-    "link-args=-sSUPPORT_LONGJMP=wasm",
+    "link-args=-sSUPPORT_LONGJMP=emscripten",
+    "-Z",
+    "emscripten-wasm-eh=false",
 ]
 [target.wasm32-unknown-unknown]
