@@ -8,7 +8,7 @@ use mrubyedge::{
     rite::rite,
     yamrb::{
         helpers::{mrb_define_class_cmethod, mrb_define_cmethod, mrb_funcall},
-        value::{RModule, RObject, RValue},
+        value::{RObject, RValue},
         vm::VM,
     },
 };
