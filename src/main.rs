@@ -146,6 +146,28 @@ fn main() {
     system_message("Environment initialized!");
 }
 
+/// Compiles Ruby source code into RITE bytecode and returns a pointer to it.
+/// Returns null on compilation failure.
+#[unsafe(no_mangle)]
+pub extern "C" fn compile_ruby_script(text_ptr: *const c_char) -> *const u8 {
+    unsafe {
+        let c_str = CStr::from_ptr(text_ptr);
+        let text = c_str.to_str().unwrap_or("");
+
+        let mut context = MRubyCompiler2Context::new();
+
+        let mrb = match context.compile(text) {
+            Ok(bytecode) => bytecode,
+            Err(e) => {
+                eprintln!("Compilation error: {}", e);
+                return std::ptr::null();
+            }
+        };
+
+        mrb.leak().as_mut_ptr()
+    }
+}
+
 /// Creates a VM on the fly and executes Ruby code to get the Ruby version
 /// Returns a pointer to a C string like "mruby/edge - v3.3.0"
 /// The returned string should be read with UTF8ToString() in JavaScript
