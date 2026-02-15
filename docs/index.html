@@ -689,16 +689,17 @@
             saveButton.textContent = '💾 Saving...';
 
             try {
-                const formData = new URLSearchParams();
-                formData.append('key', key);
-                formData.append('value', code);
+                const payload = {
+                    key: key,
+                    value: code
+                };
 
                 const response = await fetch(`${API_BASE_URL}/kv`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Content-Type': 'application/json',
                     },
-                    body: formData.toString()
+                    body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
