@@ -6,6 +6,8 @@ fn main() {
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rustc-link-search={}", out_dir);
+    // 2 ** 14 instructions
+    println!("cargo:rustc-env=MRUBYEDGE_INSN_LIMIT=16384");
     cc::Build::new()
         .files(
             glob("./vendor/mruby-compiler2/src/**/*.c")
