@@ -3,13 +3,15 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "cargo build --package mrbe-playground-api-core --target wasm32-unknown-unknown --release && cp -v ../target/wasm32-unknown-unknown/release/mrbe_playground_api_core.wasm ./src/ && wrangler dev",
+		"deploy": "npm run build:wasm && wrangler deploy",
+		"dev": "npm run build:wasm && wrangler dev",
+		"build:wasm": "cargo build --package mrbe-playground-api-core --target wasm32-unknown-unknown --release && wasm-opt --enable-bulk-memory-opt --enable-nontrapping-float-to-int --asyncify -O2 ../target/wasm32-unknown-unknown/release/mrbe_playground_api_core.wasm -o ./src/mrbe_playground_api_core.wasm",
 		"start": "wrangler dev",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20260214.0",
+		"@cloudflare/workers-types": "^4.20260218.0",
+		"asyncify-wasm": "^1.2.0",
 		"typescript": "^5.5.2",
 		"wrangler": "^4.65.0"
 	}
