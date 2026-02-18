@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { instantiate } from "asyncify-wasm";
 import mod from "./mrbe_playground_api_core.wasm";
 
 // Type declaration for WebAssembly module import
@@ -67,39 +68,10 @@ export default {
 			return new Response(null, { status: 404 });
 		}
 
-		// Handle CORS preflight for /kv endpoint
-		if (path === "/kv" && request.method === "OPTIONS") {
-			return new Response(null, {
-				status: 204,
-				headers: {
-					"Access-Control-Allow-Origin": "https://mrubyedge.github.io",
-					"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-					"Access-Control-Allow-Headers": "Content-Type",
-					"Access-Control-Max-Age": "86400"
-				}
-			});
-		}
-
 		const query = new URL(request.url).searchParams;
 
-		// Create a stub to open a communication channel with the Durable Object
-		// instance named "foo".
-		//
-		// Requests from all Workers to the Durable Object instance named "foo"
-		// will go to a single remote Durable Object instance.
+		// Create a stub to open a communication channel with the Durable Object instance
 		const stub = env.MRBE_PLAYGROUND_DATA.getByName("foo");
-
-		// Storage operations buffer for async processing
-		const pendingOperations: Array<{ type: 'set', key: string, value: string } | { type: 'get', key: string, resolve: (value: string | null) => void }> = [];
-		const cachedValues = new Map<string, string | null>();
-
-		const key = query.get("key");
-		if (request.method === "GET" && key) {
-			// preflight get value and cache it to avoid round-trip during request processing
-			const value = await stub.get(key);
-			cachedValues.set(key, value);
-			console.log(`[Preflight] GET ${key} => ${value}`);
-		}
 
 		// Create decoder/encoder once for reuse
 		const decoder = new TextDecoder();
@@ -113,51 +85,41 @@ export default {
 					console.log(`[debug]: ${decoder.decode(buffer)}`);
 					return 0;
 				},
-				// Get a value from cache and write to WebAssembly memory
-				// Returns the length of the value, or -1 if not found
-				// Value is written to the buffer at resultPtr
-				do_storage_get: (keyPtr: number, keySize: number, resultPtr: number, resultMaxSize: number): number => {
+				// Async function to get a value from Durable Object storage
+				do_storage_get: async (keyPtr: number, keySize: number, resultPtr: number, resultMaxSize: number): Promise<number> => {
 					const memory = exports.memory;
 					const keyBuffer = new Uint8Array(memory.buffer, keyPtr, keySize);
 					const key = decoder.decode(keyBuffer);
 
-					// Check if we have a cached value
-					if (cachedValues.has(key)) {
-						const value = cachedValues.get(key);
-						if (value === null) {
-							return -1;
-						}
-						const valueBytes = encoder.encode(value);
-						const resultBuffer = new Uint8Array(memory.buffer, resultPtr, resultMaxSize);
-						const length = Math.min(valueBytes.length, resultMaxSize);
-						resultBuffer.set(valueBytes.slice(0, length));
-						return length;
+					const value = await stub.get(key);
+					if (value === null) {
+						return -1;
 					}
-
-					// Value not in cache, return -1
-					return -1;
+					const valueBytes = encoder.encode(value);
+					const resultBuffer = new Uint8Array(memory.buffer, resultPtr, resultMaxSize);
+					const length = Math.min(valueBytes.length, resultMaxSize);
+					resultBuffer.set(valueBytes.slice(0, length));
+					return length;
 				},
-				// Set a value in Durable Object storage (buffered)
-				do_storage_set: (keyPtr: number, keySize: number, valuePtr: number, valueSize: number): number => {
+				// Async function to set a value in Durable Object storage
+				do_storage_set: async (keyPtr: number, keySize: number, valuePtr: number, valueSize: number): Promise<number> => {
 					const memory = exports.memory;
 					const keyBuffer = new Uint8Array(memory.buffer, keyPtr, keySize);
 					const key = decoder.decode(keyBuffer);
 					const valueBuffer = new Uint8Array(memory.buffer, valuePtr, valueSize);
 					const value = decoder.decode(valueBuffer);
 
-					// Buffer the operation for async execution
-					pendingOperations.push({ type: 'set', key, value });
-					// Update cache
-					cachedValues.set(key, value);
+					await stub.set(key, value);
 					return 0;
 				},
 			},
 		};
-		const instance = await WebAssembly.instantiate(wasmModule, importObject);
+		const instance = await instantiate(wasmModule, importObject);
 		const exports = instance.exports;
 
 		// Process request
-		const reqResult = exports.uzumibi_initialize_request(65536);
+		const reqResult = await exports.uzumibi_initialize_request(65536) as bigint;
+
 		const reqOffset = Number(reqResult & 0xFFFFFFFFn);
 		if (reqOffset === 0) {
 			const errOffset = Number((reqResult >> 32n) & 0xFFFFFFFFn);
@@ -246,7 +208,7 @@ export default {
 			throw new Error("Request data exceeds allocated buffer size");
 		}
 
-		const resResult = exports.uzumibi_start_request();
+		const resResult = await exports.uzumibi_start_request() as bigint;
 		const resOffset = Number(resResult & 0xFFFFFFFFn);
 		if (resOffset === 0) {
 			const errOffset = Number((resResult >> 32n) & 0xFFFFFFFFn);
@@ -304,16 +266,6 @@ export default {
 		// Body
 		const bodyBuffer = new Uint8Array(exports.memory.buffer, resOffset + resPos, bodySize);
 		const responseText = decoder.decode(bodyBuffer);
-
-		// Execute all pending storage operations
-		for (const op of pendingOperations) {
-			if (op.type === 'set') {
-				await stub.set(op.key, op.value);
-			} else if (op.type === 'get') {
-				const value = await stub.get(op.key);
-				op.resolve(value);
-			}
-		}
 
 		return new Response(responseText, { status: statusCode, headers: responseHeaders });
 	},
