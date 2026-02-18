@@ -1,9 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import { instantiate } from "asyncify-wasm";
 import mod from "./mrbe_playground_api_core.wasm";
+import type { MrbePlaygroundApiCoreExports } from "./wasm";
 
-// Type declaration for WebAssembly module import
-const wasmModule: WebAssembly.Module = mod as WebAssembly.Module;
+const wasmModule: WebAssembly.Module = mod;
 
 /**
  * Welcome to Cloudflare Workers! This is your first Durable Objects application.
@@ -115,10 +115,10 @@ export default {
 			},
 		};
 		const instance = await instantiate(wasmModule, importObject);
-		const exports = instance.exports;
+		const exports = instance.exports as unknown as MrbePlaygroundApiCoreExports;
 
 		// Process request
-		const reqResult = await exports.uzumibi_initialize_request(65536) as bigint;
+		const reqResult = await exports.uzumibi_initialize_request(65536);
 
 		const reqOffset = Number(reqResult & 0xFFFFFFFFn);
 		if (reqOffset === 0) {
@@ -208,7 +208,7 @@ export default {
 			throw new Error("Request data exceeds allocated buffer size");
 		}
 
-		const resResult = await exports.uzumibi_start_request() as bigint;
+		const resResult = await exports.uzumibi_start_request();
 		const resOffset = Number(resResult & 0xFFFFFFFFn);
 		if (resOffset === 0) {
 			const errOffset = Number((resResult >> 32n) & 0xFFFFFFFFn);
