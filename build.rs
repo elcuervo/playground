@@ -31,7 +31,10 @@ fn main() {
         .compile("mrubycompiler2");
 
     println!("cargo:rustc-link-lib=mrubycompiler2");
-    let emsdk_path = std::env::var("EMSDK").expect("EMSDK environment variable is not set");
+    let emsdk_path = std::env::var("EMSDK").unwrap_or_else(|_| {
+        let home = std::env::var("HOME").unwrap();
+        format!("{}/ghq/github.com/emscripten-core/emsdk", home)
+    });
 
     let bindings = bindgen::Builder::default()
         .header("./vendor/mruby-compiler2/include/mruby_compiler.h")
