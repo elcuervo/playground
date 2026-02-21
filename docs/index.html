@@ -180,6 +180,28 @@
             transform: none;
         }
 
+        #resetButton {
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: #6c757d;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #resetButton:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        }
+
+        #resetButton:active {
+            transform: translateY(0);
+        }
+
         .console-panel {
             padding: 30px;
             background: #1a1a1a;
@@ -532,7 +554,8 @@
             }
 
             #runButton,
-            #saveButton {
+            #saveButton,
+            #resetButton {
                 width: 100%;
             }
 
@@ -611,6 +634,7 @@
             <div class="button-group">
                 <button id="runButton">▶ Run Code</button>
                 <button id="saveButton">💾 Save Code</button>
+                <button id="resetButton">🗑 Reset</button>
             </div>
         </div>
 
@@ -726,6 +750,19 @@
                 saveButton.textContent = '💾 Save Code';
             }
         }
+
+        // Reset code and URL
+        function resetCode() {
+            codeInput.value = '';
+            presetSelect.value = '';
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.delete('key');
+            window.history.replaceState({}, '', newUrl);
+            consoleDiv.innerHTML = '';
+            appendToConsole('Code reset.', 'system');
+        }
+
+        document.getElementById('resetButton').addEventListener('click', resetCode);
 
         // Load code from API
         async function loadCode(key) {
