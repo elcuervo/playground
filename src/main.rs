@@ -251,12 +251,12 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char, seed: u32) {
                 #[cfg(target_arch = "wasm32")]
                 {
                     system_message(format!("Compilation error: {}", e));
-                    system_message("This may be aplatform bug");
+                    system_message("This may be a platform bug");
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 {
                     eprintln!("Compilation error: {}", e);
-                    eprintln!("This may be aplatform bug");
+                    eprintln!("This may be a platform bug");
                 }
                 return;
             }
@@ -272,8 +272,9 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char, seed: u32) {
         };
 
         let mut vm = mrubyedge::yamrb::vm::VM::open(&mut rite);
-        mruby_serde_json::init_json(&mut vm);
-        mruby_math::init_math(&mut vm);
+        mrubyedge_serde_json::init_json(&mut vm);
+        mrubyedge_math::init_math(&mut vm);
+        mrubyedge_time::init_time(&mut vm);
 
         // Execute the script and handle exceptions
         let result = match vm.run() {
