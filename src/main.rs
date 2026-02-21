@@ -227,9 +227,9 @@ pub extern "C" fn show_ruby_version() -> *const c_char {
 }
 
 // Function called from JavaScript
-// Receives Ruby script, executes it, and outputs the result
+// Receives Ruby script and optional random seed, executes it, and outputs the result
 #[unsafe(no_mangle)]
-pub extern "C" fn load_ruby_script(text_ptr: *const c_char) {
+pub extern "C" fn load_ruby_script(text_ptr: *const c_char, seed: u32) {
     unsafe {
         // Convert C string to Rust string
         let c_str = CStr::from_ptr(text_ptr);
@@ -237,12 +237,27 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char) {
 
         let mut context = MRubyCompiler2Context::new();
 
+        // Prepend Random.srand if seed is provided
+        let code_with_seed = if seed != 0 {
+            format!("Random.srand({}); {}", seed, text)
+        } else {
+            text.to_string()
+        };
+
         // Compile the Ruby script
-        let mrb = match context.compile(text) {
+        let mrb = match context.compile(&code_with_seed) {
             Ok(bytecode) => bytecode,
             Err(e) => {
-                eprintln!("Compilation error: {}", e);
-                eprintln!("Please check your Ruby code and try again");
+                #[cfg(target_arch = "wasm32")]
+                {
+                    system_message(format!("Compilation error: {}", e));
+                    system_message("This may be aplatform bug");
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    eprintln!("Compilation error: {}", e);
+                    eprintln!("This may be aplatform bug");
+                }
                 return;
             }
         };

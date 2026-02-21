@@ -1099,13 +1099,18 @@ puts JSON.generate(new_data)`
 
                     appendToConsole('Executing mruby script...', 'system');
 
+                    // Generate random seed from crypto
+                    const seedArray = new Uint32Array(1);
+                    crypto.getRandomValues(seedArray);
+                    const seed = seedArray[0];
+
                     // Call Rust function
                     try {
                         Module.ccall(
                             'load_ruby_script',
                             null,
-                            ['string'],
-                            [codeInput]
+                            ['string', 'number'],
+                            [codeInput, seed]
                         );
                     } catch (e) {
                         appendToConsole(`Execution failed: ${e.message}`, 'error');
