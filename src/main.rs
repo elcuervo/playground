@@ -3,6 +3,8 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 use std::ptr::null_mut;
+#[cfg(target_arch = "wasm32")]
+use std::rc::Rc;
 
 mod bindings {
     #![allow(nonstandard_style)]
@@ -34,12 +36,20 @@ use bindings::{
     MRC_DUMP_OK, mrc_ccontext, mrc_ccontext_free, mrc_ccontext_new, mrc_dump_irep, mrc_irep,
     mrc_irep_free, mrc_load_string_cxt,
 };
-use mrubyedge::yamrb::helpers::mrb_call_inspect;
+#[cfg(target_arch = "wasm32")]
+use mrubyedge::RObject;
+#[cfg(target_arch = "wasm32")]
+use mrubyedge::VM;
+use mrubyedge::yamrb::helpers::{mrb_call_inspect, mrb_define_singleton_cmethod};
 
 // JavaScript callback for system messages
 #[cfg(target_arch = "wasm32")]
 unsafe extern "C" {
     fn systemMessage(msg: *const c_char);
+
+    fn getTimeSec() -> u64;
+    fn getTimeNanosec() -> u32;
+    fn getOffset() -> u32;
 }
 
 /// Wrapper function for systemMessage that accepts any type implementing Into<String>
@@ -50,6 +60,24 @@ fn system_message(msg: impl Into<String>) {
         let c_msg = std::ffi::CString::new(msg_string)
             .unwrap_or_else(|_| std::ffi::CString::new("(conversion error)").unwrap());
         systemMessage(c_msg.as_ptr());
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn mrb_playground_time_source(
+    vm: &mut VM,
+    _args: &[Rc<RObject>],
+) -> Result<Rc<RObject>, mrubyedge::Error> {
+    unsafe {
+        let sec = getTimeSec();
+        let nanosec = getTimeNanosec();
+        let offset = getOffset();
+        let arr = vec![
+            RObject::integer(sec as i64).to_refcount_assigned(),
+            RObject::integer(nanosec as i64).to_refcount_assigned(),
+            RObject::integer(offset as i64).to_refcount_assigned(),
+        ];
+        Ok(RObject::array(arr).to_refcount_assigned())
     }
 }
 
@@ -275,6 +303,18 @@ pub extern "C" fn load_ruby_script(text_ptr: *const c_char, seed: u32) {
         mrubyedge_serde_json::init_json(&mut vm);
         mrubyedge_math::init_math(&mut vm);
         mrubyedge_time::init_time(&mut vm);
+        #[cfg(target_arch = "wasm32")]
+        {
+            let time_class_obj = vm
+                .get_const_by_name("Time")
+                .expect("Failed to define Time class");
+            mrb_define_singleton_cmethod(
+                &mut vm,
+                time_class_obj,
+                "__source",
+                Box::new(mrb_playground_time_source),
+            );
+        }
 
         // Execute the script and handle exceptions
         let result = match vm.run() {

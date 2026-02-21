@@ -1126,6 +1126,15 @@ puts JSON.generate(new_data)`
                 console.info(msg);
                 appendToConsole(msg, 'system');
             },
+            getTimeSec: function () {
+                return BigInt(Math.floor(Date.now() / 1000));
+            },
+            getTimeNanosec: function () {
+                return (Date.now() % 1000) * 1000000;
+            },
+            getOffset: function () {
+                return new Date().getTimezoneOffset() * -60;
+            },
             onRuntimeInitialized: function () {
                 document.getElementById('runButton').addEventListener('click', function () {
                     const codeInput = document.getElementById('codeInput').value;
