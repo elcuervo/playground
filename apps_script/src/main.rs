@@ -156,7 +156,7 @@ pub extern "C" fn eval_ruby_script_int(text_ptr: *const c_char) -> i32 {
         };
 
         let mut vm = mrubyedge::yamrb::vm::VM::open(&mut rite);
-        mruby_math::init_math(&mut vm);
+        // mruby_math::init_math(&mut vm);
 
         // Execute the script and handle exceptions
         let result = match vm.run() {

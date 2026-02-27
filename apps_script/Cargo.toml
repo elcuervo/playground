@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-mrubyedge = { version = "1.1.5", default-features = false }
-mruby-math = "0.1.0"
+mrubyedge = { version = "1.1.8", default-features = false }
+# mruby-math = "0.1.0"
 
 [build-dependencies]
 bindgen = ">= 0"
